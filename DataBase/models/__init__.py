@@ -26,7 +26,7 @@ class BaseDBModel(BaseModel):
 class User(BaseModel):
     id: int
     full_name: str
-    email: EmailStr
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     gender: Optional[str] = None
     birth_date: Optional[date] = None
@@ -45,7 +45,7 @@ class User(BaseModel):
 class UserCreate(BaseModel):
     id: int
     full_name: str
-    email: EmailStr
+    email: Optional[EmailStr] = None
     phone: Optional[str] = None
     gender: Optional[str] = None
     birth_date: Optional[date] = None

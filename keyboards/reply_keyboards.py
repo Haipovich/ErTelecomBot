@@ -13,7 +13,9 @@ def get_main_menu_keyboard() -> ReplyKeyboardMarkup:
         KeyboardButton(text="👤 Мой профиль")
     )
     builder.row(KeyboardButton(text="🆘 Поддержка / FAQ"))
-    return builder.as_markup(resize_keyboard=True, one_time_keyboard=False, input_field_placeholder=True)
+    builder.button(text="📞 Контакты")
+    builder.adjust(2, 1, 2)  # Adjust to have 2 buttons, then 1, then 2 per row
+    return builder.as_markup(resize_keyboard=True, one_time_keyboard=False, input_field_placeholder="Выберите действие...")
 
 def get_cancel_keyboard() -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()

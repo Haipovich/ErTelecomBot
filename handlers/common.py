@@ -26,7 +26,7 @@ async def handle_start(message: types.Message, state: FSMContext):
         new_user_data = UserCreate(
             id=user_id,
             full_name=user_name,
-            email=f"{username or user_id}@telegram.user",
+            email=None,
             phone=None
         )
         created_user = await user_repo.add(new_user_data)
