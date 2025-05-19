@@ -146,3 +146,12 @@ class ContentRepoData(BaseModel):
     faqs: List[FAQ] = []
     hr_contacts: List[HRContact] = []
     company_contacts: List[CompanyContact] = []
+
+class ReminderType(str, Enum):
+    H24 = "24h"
+
+class ActivityReminder(BaseDBModel):
+    user_id: int
+    activity_id: int
+    reminder_type: ReminderType
+    sent_at: datetime

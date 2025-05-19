@@ -29,6 +29,14 @@ class ActivityRepository:
             logger.error(f"Error fetching activity {activity_id}: {e}", exc_info=True)
             return None
 
+    async def get_activity_details_for_notification(self, activity_id: int) -> Optional[Activity]:
+        query = f"SELECT * FROM public.{self._table_name} WHERE id = %s"
+        try:
+            return await self._execute_query(query, (activity_id,), fetch_one=True)
+        except Exception as e:
+            logger.error(f"Error fetching activity details for notification {activity_id}: {e}", exc_info=True)
+            return None
+
     async def get_active_activities(self, upcoming_only: bool = True, limit: int = 20, offset: int = 0) -> List[Activity]:
         params = []
         where_clauses = ["is_active = TRUE"]

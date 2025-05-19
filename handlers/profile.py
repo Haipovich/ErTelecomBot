@@ -84,7 +84,7 @@ async def handle_profile_field_input(message: types.Message, state: FSMContext):
                 email_field: EmailStr
             try:
                 validated_model = EmailValidatorModel(email_field=new_value_str)
-                validated_value = validated_model.email_field # Получаем валидированное значение
+                validated_value = validated_model.email_field 
             except ValidationError as e_val:
                 error_detail = "Неверный формат email."
                 try:
@@ -113,9 +113,9 @@ async def handle_profile_field_input(message: types.Message, state: FSMContext):
             validated_value = new_value_str
 
     except (ValueError, InvalidOperation) as e:
-        error_message = f"Ошибка ввода для '{field_name_ru}': {e}\nПожалуйста, попробуйте еще раз или нажмите 'Отмена'."
+        error_message = f"Ошибка ввода для '{field_name_ru}': {e}\\nПожалуйста, попробуйте еще раз или нажмите 'Отмена'."
     except ValidationError as e:
-        error_message = f"Ошибка валидации для '{field_name_ru}'. Попробуйте еще раз.\n({e})"
+        error_message = f"Ошибка валидации для '{field_name_ru}'. Попробуйте еще раз.\\n({e})"
     except Exception as e:
         logger.error(f"Unexpected validation error for field {field_to_edit}, value '{new_value_str}': {e}")
         error_message = "Произошла непредвиденная ошибка при проверке данных. Попробуйте еще раз."
@@ -149,7 +149,7 @@ async def handle_profile_edit_field_choice(query: types.CallbackQuery, callback_
     if query.message.reply_markup:
          for row in query.message.reply_markup.inline_keyboard:
              for button in row:
-                 if button.callback_data == query.data: field_name_ru = button.text.replace("📝 ",""); break
+                 if button.callback_data == query.data: field_name_ru = button.text.replace("📝 ", ""); break
     logger.info(f"User {query.from_user.id} chose to edit field: {field_to_edit}")
     await state.update_data(field_to_edit=field_to_edit, field_name_ru=field_name_ru)
     await state.set_state(EditProfileStates.waiting_for_input)

@@ -2,6 +2,9 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from dotenv import load_dotenv
+import logging
+
+logger = logging.getLogger(__name__)
 
 env_path = Path(__file__).parent / 'secret.env'
 print(f"Loading environment variables from: {env_path}")
@@ -26,7 +29,6 @@ class DbConfig:
 
     @property
     def dsn_psycopg(self) -> str:
-        """DSN строка для psycopg."""
         return (f"host={self.host} port={self.port} "
                 f"dbname={self.name} user={self.user} "
                 f"password={self.password}")

@@ -1,10 +1,11 @@
 from contextlib import asynccontextmanager
 from typing import Optional, AsyncGenerator
 
+import psycopg
 from psycopg_pool import AsyncConnectionPool
 
 try:
-    from config import config as app_config # Импортируем общий конфиг
+    from config import config as app_config
 except ImportError:
     print("Error: Could not import 'config' from the root directory.")
     print("Make sure main.py and the DataBase directory are in the same root folder,")
@@ -71,3 +72,13 @@ async def close_db_pool():
         await _db_pool.close()
         _db_pool = None
         print("Database connection pool closed.")
+
+async def get_dedicated_db_connection():
+    if not app_config or not app_config.db:
+        raise RuntimeError("Database configuration not loaded, cannot create dedicated connection.")
+    try:
+        conn = await psycopg.AsyncConnection.connect(app_config.db.dsn_psycopg, autocommit=True)
+        return conn
+    except Exception as e:
+        print(f"Error creating dedicated DB connection: {e}")
+        return None

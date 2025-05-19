@@ -1,9 +1,10 @@
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from DataBase.models import User, Job, Activity, Application, JobType, ApplicationStatus # Добавили User
+from DataBase.models import User, Job, Activity, Application, JobType, ApplicationStatus
+from notifications import STATUS_TRANSLATIONS
 
 class JobCallbackData(CallbackData, prefix="job"):
     action: str
@@ -41,9 +42,17 @@ def get_my_applications_keyboard(applications: List[Dict[str, Any]]) -> InlineKe
     builder = InlineKeyboardBuilder()
     if not applications: return builder.as_markup()
     for app_data in applications:
-        app_id = app_data.get('id'); target_title = app_data.get('target_title', '?'); status = app_data.get('status')
+        app_id = app_data.get('id'); target_title = app_data.get('target_title', '?'); status_enum = app_data.get('status')
         if app_id is None: continue
-        status_text = status.value if isinstance(status, ApplicationStatus) else str(status)
+        if isinstance(status_enum, ApplicationStatus):
+            status_text = STATUS_TRANSLATIONS.get(status_enum, status_enum.value)
+        else:
+            try:
+                status_enum_from_str = ApplicationStatus(str(status_enum))
+                status_text = STATUS_TRANSLATIONS.get(status_enum_from_str, str(status_enum))
+            except ValueError:
+                status_text = str(status_enum)
+        
         button_text = f"📄 {target_title[:35]}... ({status_text})"
         builder.button(text=button_text, callback_data=ApplicationCallbackData(action="view_details", item_id=app_id))
     builder.adjust(1)
@@ -113,7 +122,8 @@ def format_activity_details(activity: Activity) -> str:
     return "\n".join(details)
 
 def format_application_details(application: Application, target_details: Job | Activity | None) -> str:
-    status_text = application.status.value if isinstance(application.status, ApplicationStatus) else str(application.status)
+    status_text = STATUS_TRANSLATIONS.get(application.status, application.status.value)
+    
     details = [ f"**Детали заявки ID: {application.id}**", f"*Статус:* {status_text}", f"*Подана:* {application.application_time.strftime('%d.%m.%Y %H:%M')}", "" ]
     if application.hr_comment: details.extend([f"*Комментарий HR:* {application.hr_comment}", ""])
     details.append("**Цель заявки:**")
@@ -131,7 +141,7 @@ def format_profile_details(user: User) -> str:
         f"*Телефон:* {user.phone or '(не указан)'}",
         f"*Город:* {user.city or '(не указан)'}",
         f"*Дата рождения:* {user.birth_date.strftime('%d.%m.%Y') if user.birth_date else '(не указана)'}",
-        f"*Образование:*", f"{user.education or '(не указано)'}", # Текстовые поля в новой строке
+        f"*Образование:*", f"{user.education or '(не указано)'}",
         f"*Опыт работы:*", f"{user.work_experience or '(не указан)'}",
         f"*Навыки:*", f"{user.skills or '(не указаны)'}",
         f"*Желаемая ЗП:* {f'{user.desired_salary:.2f}' if user.desired_salary else '(не указана)'}",

@@ -68,7 +68,7 @@ async def show_my_applications(target: types.Message | types.CallbackQuery, user
              logger.error(f"Error editing message for my_applications for user {user_id}: {e}")
              try: await current_message.delete()
              except Exception as del_e: logger.warning(f"Could not delete msg for user {user_id} after edit error: {del_e}")
-             await current_message.answer(text=text, reply_markup=keyboard) # Шлем от имени message
+             await current_message.answer(text=text, reply_markup=keyboard) 
              if isinstance(target, types.CallbackQuery):
                  await target.answer("Не удалось обновить предыдущее сообщение. Показан актуальный список.", show_alert=True)
 
@@ -112,7 +112,7 @@ async def handle_delete_application(query: types.CallbackQuery, callback_data: A
     else:
         logger.warning(f"Failed to delete application {app_id} for user {user_id} or deletion not allowed.")
         await query.answer(
-            "Не удалось удалить заявку.\nВозможно, ее статус уже изменился или произошла ошибка.",
+            "Не удалось удалить заявку.\\nВозможно, ее статус уже изменился или произошла ошибка.",
             show_alert=True
         )
         application = await app_repo.get_by_id_and_user(app_id, user_id)

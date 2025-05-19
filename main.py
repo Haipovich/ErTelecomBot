@@ -21,17 +21,24 @@ from config import config
 
 from DataBase import init_db_pool, close_db_pool
 from handlers import routers_list
+from db_listener import listen_for_db_notifications
+from scheduler import setup_scheduler_jobs, shutdown_scheduler
+
+listener_task = None
 
 async def main():
+    global listener_task
     logger.info("Starting bot...")
     await init_db_pool()
 
     dp = Dispatcher(storage=MemoryStorage())
-    default_properties = DefaultBotProperties(parse_mode=ParseMode.MARKDOWN)  # Или ParseMode.HTML
+    default_properties = DefaultBotProperties(parse_mode=ParseMode.HTML)
     bot = Bot(token=config.bot.token, default=default_properties)
 
     for router in routers_list:
         dp.include_router(router)
+
+    listener_task = asyncio.create_task(listen_for_db_notifications(bot))
 
     dp.startup.register(on_startup)
     dp.shutdown.register(on_shutdown)
@@ -40,15 +47,33 @@ async def main():
     try:
         await dp.start_polling(bot)
     finally:
+        logger.info("Main function: Finalizing...")
+        if listener_task and not listener_task.done():
+            logger.info("Main function: Cancelling listener task...")
+            listener_task.cancel()
+            try:
+                await listener_task
+            except asyncio.CancelledError:
+                logger.info("Main function: Listener task cancelled successfully.")
         await bot.session.close()
-        logger.info("Bot stopped.")
+        logger.info("Bot stopped or polling ended.")
 
 async def on_startup(dispatcher: Dispatcher, bot: Bot):
     logger.info("Bot started successfully.")
     await set_bot_commands(bot)
+    setup_scheduler_jobs(bot)
 
 async def on_shutdown(dispatcher: Dispatcher, bot: Bot):
+    global listener_task
     logger.warning("Shutting down bot...")
+    if listener_task and not listener_task.done():
+        logger.info("OnShutdown: Cancelling listener task...")
+        listener_task.cancel()
+        try:
+            await listener_task
+        except asyncio.CancelledError:
+            logger.info("OnShutdown: Listener task cancelled successfully.")
+    await shutdown_scheduler()
     await close_db_pool()
     logger.info("Database pool closed.")
 

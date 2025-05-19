@@ -2,8 +2,11 @@ from typing import Optional, List, Dict, Any
 import logging
 from psycopg import errors as psycopg_errors
 from psycopg.rows import dict_row, class_row
+import asyncio
+from aiogram import Bot
 
-from . import Application, ApplicationCreate, ApplicationStatus
+from . import Application, ApplicationCreate, ApplicationStatus, Activity
+from .activity_repo import ActivityRepository
 from .. import get_db_cursor
 
 logger = logging.getLogger(__name__)
@@ -125,3 +128,76 @@ class ApplicationRepository:
         except Exception as e:
             logger.error(f"Error deleting application {app_id} for user {user_id}: {e}", exc_info=True)
             return False
+
+    async def update_status_and_comment(
+        self,
+        application_id: int,
+        new_status: ApplicationStatus,
+        hr_comment: Optional[str] = None
+    ) -> bool:
+        set_parts = ["status = %s"]
+        params = [new_status.value]
+
+        if hr_comment is not None:
+            set_parts.append("hr_comment = %s")
+            params.append(hr_comment)
+        else: 
+             set_parts.append("hr_comment = NULL")
+
+
+        set_clause = ", ".join(set_parts)
+        params.append(application_id)
+
+        query = (
+            f"UPDATE public.{self._table_name} "
+            f"SET {set_clause}, updated_at = NOW() "
+            f"WHERE id = %s"
+        )
+        try:
+            rows_affected = await self._execute_query(query, tuple(params), row_factory=None)
+            updated = rows_affected is not None and rows_affected > 0
+            if updated:
+                logger.info(f"Application {application_id} status updated to {new_status}, hr_comment processed.")
+            else:
+                logger.warning(f"Application {application_id} not found or not updated for status/comment change.")
+            return updated
+        except Exception as e:
+            logger.error(f"Error updating status/comment for application {application_id}: {e}", exc_info=True)
+            return False
+
+    async def get_application_details_for_notification(self, application_id: int) -> Optional[dict]:
+        query = """
+            SELECT
+                app.id, app.user_id, app.status, app.hr_comment,
+                COALESCE(j.title, act.title, 'Неизвестная цель') AS target_title,
+                app.job_id, app.activity_id
+            FROM public.applications app
+            LEFT JOIN public.jobs j ON app.job_id = j.id
+            LEFT JOIN public.activities act ON app.activity_id = act.id
+            WHERE app.id = %s;
+        """
+        try:
+            result = await self._execute_query(query, (application_id,), fetch_one=True, row_factory=dict_row)
+            if result and 'status' in result and isinstance(result['status'], str):
+                 try:
+                     result['status'] = ApplicationStatus(result['status'])
+                 except ValueError:
+                     logger.warning(f"Unknown status '{result['status']}' for app_id {result.get('id')} in get_application_details_for_notification")
+            return result
+        except Exception as e:
+            logger.error(f"Error fetching application details for notification (app_id {application_id}): {e}", exc_info=True)
+            return None
+
+    async def get_user_ids_for_activity(self, activity_id: int) -> List[int]:
+        query = f"SELECT DISTINCT user_id FROM public.{self._table_name} WHERE activity_id = %s"
+        params = (activity_id,)
+        user_ids = []
+        try:
+            results = await self._execute_query(query, params, fetch_all=True, row_factory=dict_row)
+            if results:
+                user_ids = [row['user_id'] for row in results]
+            logger.debug(f"Found {len(user_ids)} users for activity {activity_id}: {user_ids}")
+            return user_ids
+        except Exception as e:
+            logger.error(f"Error fetching user IDs for activity {activity_id}: {e}", exc_info=True)
+            return []

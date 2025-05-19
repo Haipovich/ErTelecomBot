@@ -1,12 +1,14 @@
 import logging
+import asyncio
 from aiogram import Router, F, types
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from typing import Optional
 
 from DataBase.models.activity_repo import ActivityRepository
 from DataBase.models.application_repo import ApplicationRepository
 from DataBase.models.user_repo import UserRepository
-from DataBase.models import ApplicationCreate
+from DataBase.models import ApplicationCreate, Activity
 
 from keyboards.inline_keyboards import (
     ActivityCallbackData,
@@ -15,12 +17,14 @@ from keyboards.inline_keyboards import (
     format_activity_details,
 )
 
+from scheduler import schedule_reminder_for_activity
+
 logger = logging.getLogger(__name__)
 router = Router()
 
 LIST_LIMIT = 5
 
-@router.message(StateFilter(None), F.text == "🎯 Активности")
+@router.message(StateFilter(None), F.text == "�� Активности")
 async def handle_activities(message: types.Message, state: FSMContext):
     await show_activities_list(message)
 
@@ -76,6 +80,24 @@ async def handle_apply_activity(query: types.CallbackQuery, callback_data: Activ
     if created_app:
         await query.answer("Вы успешно зарегистрировались на активность!", show_alert=True)
         logger.info(f"Application {created_app.id} created/found for user {user_id}, activity {activity_id}")
+
+        activity_repo_for_reminder = ActivityRepository()
+        activity_details: Optional[Activity] = await activity_repo_for_reminder.get_activity_details_for_notification(activity_id)
+
+        if activity_details and activity_details.start_time:
+            logger.info(f"Handler: Attempting to schedule reminder for user {user_id} on activity {activity_id}")
+            asyncio.create_task(
+                schedule_reminder_for_activity(
+                    bot=query.bot, 
+                    user_id=user_id, 
+                    activity=activity_details
+                )
+            )
+        elif not activity_details:
+            logger.error(f"Handler: Could not schedule reminder. Activity details not found for activity_id {activity_id} after application.")
+        elif not activity_details.start_time:
+            logger.error(f"Handler: Could not schedule reminder. Activity {activity_id} start_time is not set after application.")
+
         try:
             activity_repo_inner = ActivityRepository()
             activity = await activity_repo_inner.get_by_id(activity_id)
