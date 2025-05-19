@@ -26,26 +26,51 @@ async def send_application_status_update(
     application_id: int,
     target_title: str,
     new_status: ApplicationStatus,
-    hr_comment: Optional[str]
-):
-    status_text = STATUS_TRANSLATIONS.get(new_status, str(new_status.value))
-
-    main_message_parts = [
-        f"🔔 Обновление статуса вашей заявки!",
-        f"Заявка на: {hbold(target_title)} (ID: {application_id})",
-        f"Новый статус: {hbold(status_text)}"
-    ]
+    hr_comment: Optional[str] = None
+) -> None:
+    """
+    Отправляет уведомление пользователю об изменении статуса заявки.
     
-    message_text = "\\n".join(main_message_parts) 
-
-    if hr_comment: 
-        message_text += f"\\n\\nКомментарий от HR:\\n{hitalic(hr_comment)}"
-
+    Args:
+        bot: Экземпляр бота
+        user_id: ID пользователя
+        application_id: ID заявки
+        target_title: Название цели
+        new_status: Новый статус заявки
+        hr_comment: Комментарий HR (опционально)
+    """
     try:
-        await bot.send_message(user_id, message_text)
-        logger.info(f"Sent status update to user {user_id} for application {application_id} (new status: {new_status}).")
+        # Формируем сообщение в зависимости от статуса
+        if new_status == ApplicationStatus.HIRED:
+            message = (
+                f"✅ Ваша заявка на участие в программе '{target_title}' одобрена!\n\n"
+                f"Мы рады сообщить, что вы прошли отбор и приглашаем вас к участию.\n"
+                f"В ближайшее время с вами свяжется HR-специалист для обсуждения дальнейших шагов."
+            )
+        elif new_status == ApplicationStatus.REJECTED:
+            message = (
+                f"❌ К сожалению, ваша заявка на участие в программе '{target_title}' отклонена.\n\n"
+                f"Мы ценим ваш интерес к нашей компании и желаем успехов в поиске подходящей возможности."
+            )
+        else:
+            status_text = STATUS_TRANSLATIONS.get(new_status, str(new_status.value))
+            message = f"ℹ️ Статус вашей заявки на участие в программе '{target_title}' изменен на: {status_text}"
+
+        # Добавляем комментарий HR, если он есть
+        if hr_comment:
+            # Заменяем \n на реальные переносы строк
+            hr_comment = hr_comment.replace('\\n', '\n')
+            message += f"\n\nКомментарий HR:\n{hr_comment}"
+
+        # Отправляем сообщение
+        await bot.send_message(
+            chat_id=user_id,
+            text=message,
+            parse_mode="HTML"
+        )
+        logger.info(f"Sent application status update to user {user_id} for application {application_id}")
     except Exception as e:
-        logger.error(f"Failed to send status update to user {user_id} for application {application_id}: {e}")
+        logger.error(f"Error sending application status update to user {user_id}: {e}", exc_info=True)
         
 async def process_status_change_and_notify(
     bot_instance: Bot,

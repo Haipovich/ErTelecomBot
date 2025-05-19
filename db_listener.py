@@ -19,32 +19,37 @@ async def process_application_notification(bot_instance: Bot, payload_str: str, 
     try:
         payload_data = json.loads(payload_str)
         app_id = int(payload_data.get("id"))
+        user_id = int(payload_data.get("user_id"))
+        status = payload_data.get("status")
+        hr_comment = payload_data.get("hr_comment")
+
+        if not all([app_id, user_id, status]):
+            logger.error(f"DB Listener ({APPLICATION_UPDATES_CHANNEL}): Missing required data in payload: {payload_str}")
+            return
+
+        try:
+            status_enum = ApplicationStatus(status)
+        except ValueError:
+            logger.error(f"DB Listener ({APPLICATION_UPDATES_CHANNEL}): Invalid status value: {status}")
+            return
 
         app_details = await app_repo.get_application_details_for_notification(app_id)
-
         if not app_details:
             logger.error(f"DB Listener ({APPLICATION_UPDATES_CHANNEL}): Application {app_id} details not found. Skipping.")
             return
         
-        user_id_from_db = app_details.get('user_id')
-        target_title_from_db = app_details.get('target_title', 'Неизвестная цель')
-        status_from_db = app_details.get('status')
-        hr_comment_from_db = app_details.get('hr_comment')
+        target_title = app_details.get('target_title', 'Неизвестная цель')
 
-        if not user_id_from_db or not status_from_db:
-            logger.error(f"DB Listener ({APPLICATION_UPDATES_CHANNEL}): User ID or Status missing for app {app_id}. Skipping.")
-            return
-
-        logger.info(f"DB Listener ({APPLICATION_UPDATES_CHANNEL}): Queuing notification for app_id: {app_id}, user_id: {user_id_from_db}, status: {status_from_db}")
+        logger.info(f"DB Listener ({APPLICATION_UPDATES_CHANNEL}): Queuing notification for app_id: {app_id}, user_id: {user_id}, status: {status_enum}")
         
         asyncio.create_task(
             send_application_status_update(
                 bot=bot_instance,
-                user_id=user_id_from_db,
+                user_id=user_id,
                 application_id=app_id,
-                target_title=target_title_from_db,
-                new_status=status_from_db, 
-                hr_comment=hr_comment_from_db
+                target_title=target_title,
+                new_status=status_enum, 
+                hr_comment=hr_comment
             )
         )
 
